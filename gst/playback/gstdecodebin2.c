@@ -2129,7 +2129,7 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
     GstAutoplugSelectResult ret;
     GstElementFactory *factory;
     GstDecodeElement *delem;
-    GstElement *element;
+    GstElement *element, *parent;
     GstPad *sinkpad;
     GParamSpec *pspec;
     gboolean subtitle;
@@ -2607,6 +2607,23 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
 
     /* Now let the bin handle the state */
     gst_element_set_locked_state (element, FALSE);
+
+    parent = GST_ELEMENT_PARENT(element);
+
+    if (GST_STATE_TARGET(parent) != GST_STATE_TARGET(element)) {
+        GST_DEBUG_OBJECT (element, "Manually syncing %s state %s/%s/%s with "
+            "parent %s state %s/%s/%s because target state it's different "
+            "after having unset element locked_state",
+            GST_ELEMENT_NAME(element),
+            gst_element_state_get_name(GST_STATE(element)),
+            gst_element_state_get_name(GST_STATE_TARGET(element)),
+            gst_element_state_get_name(GST_STATE_PENDING(element)),
+            GST_ELEMENT_NAME(parent),
+            gst_element_state_get_name(GST_STATE(parent)),
+            gst_element_state_get_name(GST_STATE_TARGET(parent)),
+            gst_element_state_get_name(GST_STATE_PENDING(parent)));
+        gst_element_sync_state_with_parent(element);
+    }
 
     if (subtitle) {
       SUBTITLE_LOCK (dbin);
