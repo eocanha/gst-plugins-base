@@ -5150,6 +5150,63 @@ done:
 }
 
 static gboolean
+autoplug_query_allocation (GstElement * uridecodebin, GstPad * pad,
+    GstElement * element, GstQuery * query, GstSourceGroup * group)
+{
+  GstElement *sink;
+  GstPad *sinkpad = NULL;
+  GstElementFactory *factory;
+  gboolean result = FALSE;
+
+  GST_SOURCE_GROUP_LOCK (group);
+
+  factory = gst_element_get_factory (element);
+  if (!factory)
+    goto done;
+
+  if (gst_element_factory_list_is_type (factory,
+          GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO |
+          GST_ELEMENT_FACTORY_TYPE_MEDIA_IMAGE)) {
+    /* If this is from the subtitle uridecodebin we don't need to
+     * check the audio and video sink */
+    if (group->suburidecodebin
+        && gst_object_has_as_ancestor (GST_OBJECT_CAST (pad),
+            GST_OBJECT_CAST (group->suburidecodebin)))
+      goto done;
+
+    if ((sink = group->video_sink))
+      sinkpad = gst_element_get_static_pad (sink, "sink");
+  } else if (gst_element_factory_list_is_type (factory,
+          GST_ELEMENT_FACTORY_TYPE_MEDIA_AUDIO)) {
+    /* If this is from the subtitle uridecodebin we don't need to
+     * check the audio and video sink */
+    if (group->suburidecodebin
+        && gst_object_has_as_ancestor (GST_OBJECT_CAST (pad),
+            GST_OBJECT_CAST (group->suburidecodebin)))
+      goto done;
+
+    if ((sink = group->audio_sink))
+      sinkpad = gst_element_get_static_pad (sink, "sink");
+  } else if (gst_element_factory_list_is_type (factory,
+          GST_ELEMENT_FACTORY_TYPE_MEDIA_SUBTITLE)) {
+    if ((sink = group->playbin->text_sink))
+      sinkpad = gst_element_get_static_pad (sink, "sink");
+  } else {
+    goto done;
+  }
+
+  if (sinkpad) {
+    result = gst_pad_query (sinkpad, query);
+    gst_object_unref (sinkpad);
+  }
+
+done:
+  GST_SOURCE_GROUP_UNLOCK (group);
+
+  return result;
+}
+
+static gboolean
 autoplug_query_cb (GstElement * uridecodebin, GstPad * pad,
     GstElement * element, GstQuery * query, GstSourceGroup * group)
 {
@@ -5159,6 +5216,8 @@ autoplug_query_cb (GstElement * uridecodebin, GstPad * pad,
       return autoplug_query_caps (uridecodebin, pad, element, query, group);
     case GST_QUERY_CONTEXT:
       return autoplug_query_context (uridecodebin, pad, element, query, group);
+    case GST_QUERY_ALLOCATION:
+      return autoplug_query_allocation (uridecodebin, pad, element, query, group);
     default:
       return FALSE;
   }

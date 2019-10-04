@@ -4968,13 +4968,15 @@ source_pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
       GST_LOG_OBJECT (pad, "Letting non-serialized query through");
       return GST_PAD_PROBE_PASS;
     }
-    if (!gst_pad_has_current_caps (pad)) {
+    if (!gst_pad_has_current_caps (pad)
+        || GST_QUERY_TYPE (query) == GST_QUERY_ALLOCATION) {
       /* do not block on allocation queries before we have caps,
        * this would deadlock because we are doing no autoplugging
        * without caps.
        * TODO: Try to do autoplugging based on the query caps
        */
-      GST_LOG_OBJECT (pad, "Letting serialized query before caps through");
+      GST_LOG_OBJECT (pad, "Letting serialized allocation query or query "
+          "before caps through");
       return GST_PAD_PROBE_PASS;
     }
   }
